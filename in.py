@@ -175,10 +175,19 @@ with tf.Session() as sess:
 import tensorflow as tf
 import numpy
 
+def get_file_line(filename):
+    myfile = open(filename) 
+    lines = len(myfile.readlines()) 
+    return lines
+
 def read(filenames, batch_size):
     # 生成一个先入先出队列和一个QueueRunner,生成文件名队列  
 		
-    filename_queue = tf.train.string_input_producer(filenames, shuffle=False)  
+    filename_queue = tf.train.string_input_producer(filenames, shuffle=False)
+    print(filename_queue.queue_ref)
+    lines = get_file_line(filename="data/sh_hq_000001_2011.csv")
+    print(lines)
+    
     # 定义Reader  
     reader = tf.TextLineReader(skip_header_lines=1)
     key, value = reader.read(filename_queue)  
@@ -202,12 +211,12 @@ def read(filenames, batch_size):
 
 
 filenames = ["data/sh_hq_000001_2011.csv", "data/sh_hq_000001_2012.csv"]
-val1, val2 = read(filenames, batch_size=10)
+val1, val2 = read(filenames, batch_size=3)
 print(val1, val2)
 
 numpy.set_printoptions(threshold='nan')
 filenames = ["data/sz_hq_300188_2011.csv", "data/sz_hq_300188_2012.csv"]
-val1_300188, val2_300188 = read(filenames, batch_size=1000)
+val1_300188, val2_300188 = read(filenames, batch_size=2)
 print("%s" %val1_300188)
 print(val2_300188)
 #print("%.3f" %val2_300188)
