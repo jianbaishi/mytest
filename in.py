@@ -53,12 +53,13 @@ with tf.Session() as sess:
 '''
 import tensorflow as tf
 import os
-
+'''
 filename = os.path.join("data","contact")
 filename_queue = tf.train.string_input_producer(["data/sh_hq_000001_2011.csv", 
                                                  "data/sh_hq_000001_2012.csv"])
 reader = tf.TextLineReader(skip_header_lines=1)
 key, value = reader.read(filename_queue)
+produced = reader.num_records_produced()
 
 # Default values, in case of empty columns. Also specifies the type of the
 # decoded result.
@@ -73,11 +74,143 @@ with tf.Session() as sess:
   coord = tf.train.Coordinator()
   threads = tf.train.start_queue_runners(coord=coord)
 
-  for i in range(700):
+
+  tmp_key = sess.run([key])
+  print(tmp_key)
+  while 1:
     # Retrieve a single instance:
+    
     example, label = sess.run([features, D_output])
+    date = col3.eval()
+    print(produced.eval())
+    print(col3)
+    print(date)
     #print(example.eval(),label.eval())
     print(example,label)
+    key_line = sess.run([key])
+    #flag = tf.equal(tmp_key, key_line, name="Cmp")
+    #if 1:
+    #	break
 
   coord.request_stop()
   coord.join(threads)
+'''
+'''
+import tensorflow as tf
+import os
+
+#设置工作目录
+
+#查看目录
+print(os.getcwd())
+
+#读取函数定义
+def read_data(file_queue):
+    reader = tf.TextLineReader(skip_header_lines=1)
+    key, value = reader.read(file_queue)
+    record_defaults = [['null'], ['null'], ['null'], ['null'], [0.0], [0.0], [0.0], [0.0], [0.0], [0.0], [0.0], [0.0], [0.0]]
+    col1, col2, col3, col4, col5, col6, col7, col8, col9, col10, col11, col12, col13 = tf.decode_csv(value,record_defaults=record_defaults)
+    features = tf.stack([col3, col1, col2, col4])
+    output = tf.stack([col5, col6, col7, col8, col9, col10, col11, col12, col13])
+    D_output = tf.to_double(output, name='ToDouble')
+    
+    return features,D_output
+
+def create_pipeline(batch_size, num_epochs=None):
+    file_queue = tf.train.string_input_producer(["data/sh_hq_000001_2011.csv", 
+                                                 "data/sh_hq_000001_2012.csv"], num_epochs=num_epochs)
+    example, label = read_data(file_queue)
+
+    min_after_dequeue = 100
+    capacity = min_after_dequeue + batch_size
+    print("capacity %d" %capacity)
+    example_batch, label_batch = tf.train.shuffle_batch(
+        [example, label], batch_size=batch_size, capacity=capacity,
+        min_after_dequeue=min_after_dequeue
+    )
+
+    return example_batch, label_batch
+
+x_train_batch, y_train_batch = create_pipeline(batch_size=10, num_epochs=100)
+print(x_train_batch,y_train_batch)
+'''
+'''
+with tf.Session() as sess:  
+    coord = tf.train.Coordinator()  #创建一个协调器，管理线程  
+    threads = tf.train.start_queue_runners(coord=coord)  #启动QueueRunner, 此时文件名队列已经进队。  
+    for i in range(10):  
+        e_val,l_val = sess.run([example_batch, label_batch])  
+        print e_val,l_val  
+    coord.request_stop()  
+    coord.join(threads)  
+    
+'''
+'''
+import tensorflow as tf
+
+# 生成一个先入先出队列和一个QueueRunner,生成文件名队列  
+filenames = ["data/sh_hq_000001_2011.csv", "data/sh_hq_000001_2012.csv"]  
+filename_queue = tf.train.string_input_producer(filenames, shuffle=False)  
+# 定义Reader  
+reader = tf.TextLineReader(skip_header_lines=1)  
+key, value = reader.read(filename_queue)  
+# 定义Decoder  
+record_defaults = [['null'], ['null'], ['null'], ['null'], [0.0], [0.0], [0.0], [0.0], [0.0], [0.0], [0.0], [0.0], [0.0]]
+col1, col2, col3, col4, col5, col6, col7, col8, col9, col10, col11, col12, col13 = tf.decode_csv(value,record_defaults=record_defaults)
+features = tf.stack([col3, col1, col2, col4])
+output = tf.stack([col5, col6, col7, col8, col9, col10, col11, col12, col13]) 
+example_batch, label_batch = tf.train.shuffle_batch([features,output], batch_size=10, capacity=20, min_after_dequeue=10, num_threads=1)  
+# 运行Graph  
+with tf.Session() as sess:  
+    coord = tf.train.Coordinator()  #创建一个协调器，管理线程  
+    threads = tf.train.start_queue_runners(coord=coord)  #启动QueueRunner, 此时文件名队列已经进队。  
+    for i in range(1):  
+        e_val,l_val = sess.run([example_batch, label_batch])  
+        print e_val,l_val  
+    coord.request_stop()  
+    coord.join(threads)  
+'''
+ 
+ 
+import tensorflow as tf
+import numpy
+
+def read(filenames, batch_size):
+    # 生成一个先入先出队列和一个QueueRunner,生成文件名队列  
+		
+    filename_queue = tf.train.string_input_producer(filenames, shuffle=False)  
+    # 定义Reader  
+    reader = tf.TextLineReader(skip_header_lines=1)
+    key, value = reader.read(filename_queue)  
+    # 定义Decoder  
+    record_defaults = [['null'], ['null'], ['null'], ['null'], [0.0], [0.0], [0.0], [0.0], [0.0], [0.0], [0.0], [0.0], [0.0]]
+    col1, col2, col3, col4, col5, col6, col7, col8, col9, col10, col11, col12, col13 = tf.decode_csv(value,record_defaults=record_defaults)
+    features = tf.stack([col3, col1, col2, col4])
+    output = tf.stack([col5, col6, col7, col8, col9, col10, col11, col12, col13]) 
+    tf.set_random_seed(0)
+    example_batch, label_batch = tf.train.batch([features,output], batch_size=batch_size, capacity=2000, num_threads=1)
+    print(example_batch, label_batch)
+    # 运行Graph  
+    with tf.Session() as sess:  
+        coord = tf.train.Coordinator()  #创建一个协调器，管理线程  
+        threads = tf.train.start_queue_runners(coord=coord)  #启动QueueRunner, 此时文件名队列已经进队。  
+        e_val,l_val = sess.run([example_batch, label_batch])  
+        #print e_val,l_val  
+        coord.request_stop()  
+        coord.join(threads)
+    return e_val,l_val
+
+
+filenames = ["data/sh_hq_000001_2011.csv", "data/sh_hq_000001_2012.csv"]
+val1, val2 = read(filenames, batch_size=10)
+print(val1, val2)
+
+numpy.set_printoptions(threshold='nan')
+filenames = ["data/sz_hq_300188_2011.csv", "data/sz_hq_300188_2012.csv"]
+val1_300188, val2_300188 = read(filenames, batch_size=1000)
+print("%s" %val1_300188)
+print(val2_300188)
+#print("%.3f" %val2_300188)
+
+a=[1.1,2.2,3.3]
+print(a)
