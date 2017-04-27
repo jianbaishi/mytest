@@ -52,6 +52,7 @@ with tf.Session() as sess:
 
 '''
 import tensorflow as tf
+from tensorflow.contrib import rnn
 import os
 '''
 filename = os.path.join("data","contact")
@@ -175,6 +176,22 @@ with tf.Session() as sess:
 import tensorflow as tf
 import numpy
 
+seq_max_len = 28
+n_input = 28
+rnn_unit = 28
+n_hidden = 28 # hidden layer num of features
+n_classes = 5 # MNIST total classes (0-9 digits)
+
+seqlen = tf.placeholder(tf.int32, [None])
+
+weights = {
+    'out': tf.Variable(tf.random_normal([n_hidden, n_classes]))
+}
+biases = {
+    'out': tf.Variable(tf.random_normal([n_classes]))
+}
+
+
 def get_file_line(filename_s):
     line_s = 0
     file_num = len(filename_s)
@@ -200,6 +217,9 @@ def read(filenames, batch_size):
     features = tf.stack([col3, col1, col2, col4])
     features_1 = tf.stack([col5, col6, col7, col8, col9, col10, col11, col12, col13])
     in_put_f = tf.stack([col5, col6, col7, col8, col9, col10, col13])
+    #features = tf.stack([[col3], [col1], [col2], [col4]])
+    #features_1 = tf.stack([[col5], [col6], [col7], [col8], [col9], [col10], [col11], [col12], [col13]])
+    #in_put_f = tf.stack([[col5], [col6], [col7], [col8], [col9], [col10], [col13]])
     out_put_f = tf.stack([col10])
     tf.set_random_seed(0)
     example_batch, label_batch, in_put, out_put = tf.train.batch([features, features_1, in_put_f, out_put_f], batch_size=batch_size, capacity=2000, num_threads=1)
@@ -246,18 +266,18 @@ def get_in_concat_data(in1, in2, in3, in4):
     with tf.Session() as sess:  
         coord = tf.train.Coordinator()  #创建一个协调器，管理线程  
         threads = tf.train.start_queue_runners(coord=coord)  #启动QueueRunner, 此时文件名队列已经进队。  
-        input_3_val = sess.run([input_3])  
+        input_3_val = sess.run(input_3)  
         #print e_val,l_val  
         coord.request_stop()  
         coord.join(threads)
     return input_3_val, input_3
 
-def get_in_data_last5dat(int_put, begin, size):
-    int_put_data = tf.slice(int_put, [begin, 0], [size, 4])
+def get_in_data_last5day(int_put, begin, size):
+    int_put_data = tf.slice(int_put, [begin, 0], [size, 28])
     with tf.Session() as sess:  
         coord = tf.train.Coordinator()  #创建一个协调器，管理线程  
         threads = tf.train.start_queue_runners(coord=coord)  #启动QueueRunner, 此时文件名队列已经进队。  
-        int_put_val = sess.run([int_put_data])  
+        int_put_val = sess.run(int_put_data)  
         #print e_val,l_val  
         coord.request_stop()  
         coord.join(threads)
@@ -267,7 +287,7 @@ def get_in_data_last5dat(int_put, begin, size):
 def get_out_data_last5day(out, lines):
     out_put = tf.gather(out,[1, 2, 3, 4, 5])
     out_put_tra = tf.transpose(out_put)
-    print(out_put_tra)
+    #print(out_put_tra)
     for index in range(1,lines - 5):
         one_out = tf.gather(out,[1 + index, 2 + index, 3 + index, 4 + index, 5 + index])
         one_out_tra = tf.transpose(one_out)
@@ -278,15 +298,229 @@ def get_out_data_last5day(out, lines):
     with tf.Session() as sess:  
         coord = tf.train.Coordinator()  #创建一个协调器，管理线程  
         threads = tf.train.start_queue_runners(coord=coord)  #启动QueueRunner, 此时文件名队列已经进队。  
-        out_put_tra_val = sess.run([out_put_tra])
+        out_put_tra_val = sess.run(out_put_tra)
         print(out_put_tra_val)
         #print e_val,l_val  
         coord.request_stop()  
         coord.join(threads)
     return out_put_tra_val, out_put_tra
 
+def get_step_info(input, index, step, batch):
+    return out;
 
+def dynamicRNN(x, seqlen, weights, biases):
 
+    # Prepare data shape to match `rnn` function requirements
+    # Current data input shape: (batch_size, n_steps, n_input)
+    # Required shape: 'n_steps' tensors list of shape (batch_size, n_input)
+    
+    #print(x)
+    # Unstack to get a list of 'n_steps' tensors of shape (batch_size, n_input)
+    #tx2 = tf.transpose(tx3)
+    #tx = tf.unstack(tx2, 1, 1)
+    x = tf.unstack(x, 28, 0)
+    #tx = tf.stack(x)
+    #x_ = tf.transpose(tx)
+    #print(x_)
+
+    # Define a lstm cell with tensorflow
+    lstm_cell = tf.contrib.rnn.BasicLSTMCell(28)
+
+    # Get lstm cell output, providing 'sequence_length' will perform dynamic
+    # calculation.
+    outputs, states = tf.contrib.rnn.static_rnn(lstm_cell, x, dtype=tf.float32, sequence_length=seqlen)
+
+    # When performing dynamic calculation, we must retrieve the last
+    # dynamically computed output, i.e., if a sequence length is 10, we need
+    # to retrieve the 10th output.
+    # However TensorFlow doesn't support advanced indexing yet, so we build
+    # a custom op that for each sample in batch size, get its length and
+    # get the corresponding relevant output.
+
+    # 'outputs' is a list of output at every timestep, we pack them in a Tensor
+    # and change back dimension to [batch_size, n_step, n_input]
+    outputs = tf.stack(outputs)
+    outputs = tf.transpose(outputs, [1, 0, 2])
+
+    # Hack to build the indexing and retrieve the right output.
+    batch_size = tf.shape(outputs)[0]
+    # Start indices for each sample
+    index = tf.range(0, batch_size) * seq_max_len + (seqlen - 1)
+    # Indexing
+    outputs = tf.gather(tf.reshape(outputs, [-1, n_hidden]), index)
+
+    # Linear activation, using outputs computed above
+    return tf.matmul(outputs, weights['out']) + biases['out']
+
+def lstm(X):     
+    batch_size=tf.shape(X)[0]
+    time_step=tf.shape(X)[1]
+    w_in=weights['in']
+    b_in=biases['in']  
+    input=tf.reshape(X,[-1,n_input])  #需要将tensor转成2维进行计算，计算后的结果作为隐藏层的输入
+    print("input", input)
+    #input_rnn=tf.matmul(input,w_in)+b_in
+    input_rnn=tf.reshape(input,[-1,time_step,rnn_unit])  #将tensor转成3维，作为lstm cell的输入
+    cell=rnn.BasicLSTMCell(rnn_unit)
+    init_state=cell.zero_state(batch_size,dtype=tf.float32)
+    output_rnn,final_states=tf.nn.dynamic_rnn(cell, input_rnn,initial_state=init_state, dtype=tf.float32)  #output_rnn是记录lstm每个输出节点的结果，final_states是最后一个cell的结果
+    output=tf.reshape(output_rnn,[-1,rnn_unit]) #作为输出层的输入
+    w_out=weights['out']
+    b_out=biases['out']
+    pred=tf.matmul(output,w_out)+b_out
+    return pred,final_states
+
+def lstm_test(X):
+    batch_size=tf.shape(X)[0]
+    time_step=tf.shape(X)[1]
+    print(batch_size, time_step)
+    w_in=weights['out']
+    b_in=biases['out']  
+    input=tf.reshape(X,[-1,n_input])  #需要将tensor转成2维进行计算，计算后的结果作为隐藏层的输入
+    print("input", input)
+    #input_rnn=tf.matmul(input,w_in)+b_in
+    input_rnn=tf.reshape(input,[-1,time_step,rnn_unit])  #将tensor转成3维，作为lstm cell的输入
+    cell=rnn.BasicLSTMCell(rnn_unit)
+    init_state=cell.zero_state(batch_size,dtype=tf.float32)
+    output_rnn,final_states=tf.nn.dynamic_rnn(cell, input_rnn,initial_state=init_state, dtype=tf.float32)  #output_rnn是记录lstm每个输出节点的结果，final_states是最后一个cell的结果
+    output=tf.reshape(output_rnn,[-1,rnn_unit]) #作为输出层的输入
+    w_out=weights['out']
+    b_out=biases['out']
+    pred=tf.matmul(output,w_out)+b_out
+    return X
+
+def test_spahe(train_x):
+    tx1 = tf.stack([train_x[1:5]])
+    tx3 = tf.stack(train_x[1:2])
+    tx2 = tf.transpose(tx3)
+    tx = tf.unstack(tx2, 1, 1)
+    #tx = tf.unstack(train_x[1:5], 28, 1)
+    #tx2 = tf.depth_to_space(tx3, 2)
+    with tf.Session() as sess:
+        tx_ = sess.run(tx)
+        tx1_ = sess.run(tx1)
+        tx2_ = sess.run(tx2)
+        print("||||||||||||||||||||||||||||||||||||||")
+        print(tx1_)
+        print("||||||||||||||||||||||||||||||||||||||")
+        print(train_x[1:5])
+        print(tx_)
+        print(tx3, tx2)
+        print(tx2_)
+        print("||||||||||||||||||||||||||||||||||||||")
+    return tx_
+
+"""
+    pred = dynamicRNN(X, seqlen, weights, biases)
+    #print(train_x,train_y)
+    #print(X,Y,pred)
+    lr = 0.01
+    #损失函数
+    loss=tf.reduce_mean(tf.square(tf.reshape(pred,[-1])-tf.reshape(Y, [-1])))
+    train_op=tf.train.AdamOptimizer(lr).minimize(loss)
+    saver=tf.train.Saver(tf.global_variables(),max_to_keep=15)
+    outfile="out/"
+    #module_file = tf.train.latest_checkpoint(outfile)    
+    module_file = tf.train.latest_checkpoint(outfile, latest_filename="train")
+    a = tf.placeholder("float")
+    b = tf.placeholder("float")
+    c = tf.multiply(a, b)
+    #T = lstm_test(X)
+    #test,_ = lstm(train_x[0][0:0+2])
+    #print("test", test)
+"""
+
+def train_lstm(train_x, train_y, batch_size=80,time_step=2,train_begin=0,train_end=50):
+    X=tf.placeholder(tf.float32, shape=[None,28])
+    Y=tf.placeholder(tf.float32, shape=[None,5])
+    batch_index = 10
+    step = 2
+    seqlen = [4]
+    #pred,state=lstm(X)
+    #tmp_x = train_x[1:1+2]
+    #tmp_y = train_y[1:1+2]
+    #print(tmp_x, tmp_y)
+    #tx = tf.unstack(tmp_x, 28, 1)
+    #print("tx", tx)
+    pred = dynamicRNN(X, seqlen, weights, biases)
+    #print(train_x,train_y)
+    #print(X,Y,pred)
+    lr = 0.01
+    #损失函数
+    loss=tf.reduce_mean(tf.square(tf.reshape(pred,[-1])-tf.reshape(Y, [-1])))
+    train_op=tf.train.AdamOptimizer(lr).minimize(loss)
+    saver=tf.train.Saver(tf.global_variables(),max_to_keep=15)
+    outfile="out/"
+    #module_file = tf.train.latest_checkpoint(outfile)    
+    module_file = tf.train.latest_checkpoint(outfile, latest_filename="train")
+    a = tf.placeholder("float")
+    b = tf.placeholder("float")
+    c = tf.multiply(a, b)
+
+    #T = lstm_test(X)
+    #test,_ = lstm(train_x[0][0:0+2])
+    #print("test", test)
+    with tf.Session() as sess:
+        sess.run(tf.global_variables_initializer())
+        #print(sess.run(c, feed_dict={a:2, b:5}))
+        #tx_ = sess.run(tx)
+        #print("---------")
+        #print(tx)
+        #print("---------")
+        #print(tx_)
+        #print("---------")
+        #saver.restore(sess, module_file)
+        #重复训练2000次
+        for i in range(2):
+            for step in range(1):
+                tmp_x = train_x[step:step+1]
+                tmp_y = train_y[step:step+1]
+                tx = tf.stack(tmp_x)
+                x1 = tf.transpose(tx)
+                x2 = tf.unstack(x1, 28, 0)
+                x1_ = sess.run(x1)
+                x2_ = sess.run(x2)
+                print("XXXXXXXXXXXXXXXX")
+                print(x1)
+                print(x2)
+                print(x1_)
+                print(x2_)
+                print("XXXXXXXXXXXXXXXX")
+                print(tmp_x, tmp_y)
+                print("XXXXXXXXXXXXXXXX")
+                pred_ = sess.run([pred],feed_dict={X:x1})
+                #print(step, "=", train_x[0][step:step+2])
+                #t_y = sess.run([tf.slice(train_y, [step, 0], [step + 1, 5])])
+                #loss_ = sess.run([loss],feed_dict={X:tmp_x,Y:tmp_y})
+                #train_op_ = sess.run([train_op],feed_dict={X:train_x[0][step:step+1],Y:train_y[0][step:step+1]})
+                #_,loss_=sess.run([train_op,loss],feed_dict={X:train_x[0][step:step+1],Y:train_y[0][step:step+1]})
+                #print(step, t_x, t_y)
+                #_,loss_=sess.run([train_op,loss],feed_dict={X:train_x,Y:train_y})
+            #print(i,loss_)
+            #if i % 200==0:
+            #    print("保存模型：",saver.save(sess,'stock2.model',global_step=i))
+    return train_x
+'''
+def prediction(time_step=20):
+    X=tf.placeholder(tf.float32, shape=[None,time_step,input_size])
+    mean,std,test_x,test_y=get_test_data(time_step)
+    pred,_=lstm(X)     
+    saver=tf.train.Saver(tf.global_variables())
+    module_file = os.path.join([tf.train.latest_checkpoint(outfile), "meta"])
+    with tf.Session() as sess:
+        #参数恢复
+        module_file = tf.train.latest_checkpoint()
+        saver.restore(sess, module_file) 
+        test_predict=[]
+        for step in range(len(test_x)-1):
+          prob=sess.run(pred,feed_dict={X:[test_x[step]]})   
+          predict=prob.reshape((-1))
+          test_predict.extend(predict)
+        test_y=np.array(test_y)*std[7]+mean[7]
+        test_predict=np.array(test_predict)*std[7]+mean[7]
+        acc=np.average(np.abs(test_predict-test_y[:len(test_predict)])/test_y[:len(test_predict)]) #acc为测试集偏差
+    return acc
+'''
 #numpy.set_printoptions(threshold='nan')
 
 filenames_000001 = ["data/sh_hq_000001_2011.csv", "data/sh_hq_000001_2012.csv", "data/sh_hq_000001_2013.csv", "data/sh_hq_000001_2014.csv", \
@@ -303,7 +537,7 @@ lines_300188 = get_file_line(filename_s=filenames_300188)
 begin = lines_000001 - lines_300188 + 1
 #后面5个数据无法测试
 test_day = 5
-input_size = lines_300188 - 1
+input_size = 50 #lines_300188 - 1
 output_size = input_size
 
 #e_val_000001, l_val_000001, example_batch_000001, label_batch_000001 = get_info_form_file(filenames_000001)
@@ -337,15 +571,80 @@ print(in_put_300188, out_put_300188)
 
 input_val, input_data = get_in_concat_data(in1=in_put_000001, in2=in_put_399001, in3=in_put_399006, in4=in_put_300188)
 print(input_data)
+print("XXXXXXXXXXXXXXXX")
 print(input_val)
+print(input_val.shape)
+print("XXXXXXXXXXXXXXXX")
 
-real_input_val, real_input_data = get_in_data_last5dat(input_data, 0, input_size - 5)
+real_input_val, real_input_data = get_in_data_last5day(input_data, 0, input_size - 5)
 print(real_input_data)
 
 print("=======================")
 output_data_val, output_data = get_out_data_last5day(out_put_300188, output_size)
+print(output_data_val.shape)
+print(output_data_val[2:4])
 print("=======================")
 #print(out_val_300188)
+
+#测试数据获取
+'''
+filenames_000001_test = ["data/sh_hq_000001_2017.csv"]
+filenames_399001_test = ["data/sz_hq_399001_2017.csv"]
+filenames_399006_test = ["data/sz_hq_399006_2017.csv"]
+filenames_300188_test = ["data/sz_hq_300188_2017.csv"]
+
+lines_000001_test = get_file_line(filename_s=filenames_000001_test)
+lines_300188_test = get_file_line(filename_s=filenames_300188_test)
+begin_test = 0
+#后面5个数据无法测试
+test_day_test = 5
+input_size_test = lines_300188_test
+output_size_test = input_size_test
+
+#e_val_000001, l_val_000001, example_batch_000001, label_batch_000001 = get_info_form_file(filenames_000001)
+#e_val_399001, l_val_399001, example_batch_399001, label_batch_399001 = get_info_form_file(filenames_399001)
+#e_val_399006, l_val_399006, example_batch_399006, label_batch_399006 = get_info_form_file(filenames_399006)
+#e_val_300188, l_val_300188, example_batch_300188, label_batch_300188 = get_info_form_file(filenames_300188)
+
+e_val_000001_test, l_val_000001_test, example_batch_000001_test, label_batch_000001_test, in_val_000001_test, \
+    out_val_000001_test, in_put_000001_test, out_put_000001_test = \
+    get_info_form_file_and_slice(filenames=filenames_000001_test, begin=begin_test, size=input_size_test, diff_size=0)
+e_val_399001_test, l_val_399001_test, example_batch_399001_test, label_batch_399001_test, in_val_399001_test, \
+    out_val_399001_test, in_put_399001_test, out_put_399001_test = \
+    get_info_form_file_and_slice(filenames=filenames_399001_test, begin=begin_test, size=input_size_test, diff_size=0)
+e_val_399006_test, l_val_399006_test, example_batch_399006_test, label_batch_399006_test, in_val_399006_test, \
+    out_val_399006_test, in_put_399006_test, out_put_399006_test = \
+    get_info_form_file_and_slice(filenames=filenames_399006_test, begin=begin_test, size=input_size_test, diff_size=0)
+e_val_300188_test, l_val_300188_test, example_batch_300188_test, label_batch_300188_test, in_val_300188_test, \
+    out_val_300188_test, in_put_300188_test, out_put_300188_test = \
+    get_info_form_file_and_slice(filenames=filenames_300188_test, begin=begin_test, size=input_size_test, diff_size=0)
+
+
+print(in_put_000001_test, out_put_000001_test)
+print(in_put_399001_test, out_put_399001_test)
+print(in_put_399006_test, out_put_399006_test)
+print(in_put_300188_test, out_put_300188_test)
+
+input_val_test, input_data_test = get_in_concat_data(in1=in_put_000001_test, in2=in_put_399001_test, in3=in_put_399006_test, in4=in_put_300188_test)
+print(input_data_test)
+print(input_val_test)
+
+real_input_val_test, real_input_data_test = get_in_data_last5day(input_data_test, 0, input_size_test - 5)
+print(real_input_data_test)
+
+print("=======================")
+output_data_val_test, output_data_test = get_out_data_last5day(out_put_300188_test, output_size_test)
+print(output_data_test)
+print("=======================")
+'''
+
+
+#X=tf.placeholder(tf.float32, shape=[None,10,28])
+#pred,states=lstm(X)
+#print(X, pred, states)
+_ = train_lstm(train_x = real_input_val, train_y = output_data_val)
+#_ = test_spahe(train_x = real_input_val)
+
 
 '''
 in_1 = tf.concat([in_put_000001, in_put_399001], 1)
