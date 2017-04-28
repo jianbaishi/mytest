@@ -318,17 +318,18 @@ def dynamicRNN(x, seqlen, weights, biases):
     # Unstack to get a list of 'n_steps' tensors of shape (batch_size, n_input)
     #tx2 = tf.transpose(tx3)
     #tx = tf.unstack(tx2, 1, 1)
-    x = tf.unstack(x, 28, 0)
+    print(x)
+    x = tf.unstack(x, 28, 1)
     #tx = tf.stack(x)
     #x_ = tf.transpose(tx)
-    #print(x_)
+    print(x)
 
     # Define a lstm cell with tensorflow
     lstm_cell = tf.contrib.rnn.BasicLSTMCell(28)
 
     # Get lstm cell output, providing 'sequence_length' will perform dynamic
     # calculation.
-    outputs, states = tf.contrib.rnn.static_rnn(lstm_cell, x, dtype=tf.float32, sequence_length=seqlen)
+    outputs, states = tf.contrib.rnn.static_rnn(lstm_cell, x, dtype=tf.float32)
 
     # When performing dynamic calculation, we must retrieve the last
     # dynamically computed output, i.e., if a sequence length is 10, we need
@@ -431,11 +432,11 @@ def test_spahe(train_x):
 """
 
 def train_lstm(train_x, train_y, batch_size=80,time_step=2,train_begin=0,train_end=50):
-    X=tf.placeholder(tf.float32, shape=[None,28])
+    X=tf.placeholder(tf.float32, shape=[None,28, 1])
     Y=tf.placeholder(tf.float32, shape=[None,5])
     batch_index = 10
     step = 2
-    seqlen = [4]
+    seqlen = 4
     #pred,state=lstm(X)
     #tmp_x = train_x[1:1+2]
     #tmp_y = train_y[1:1+2]
@@ -456,7 +457,6 @@ def train_lstm(train_x, train_y, batch_size=80,time_step=2,train_begin=0,train_e
     a = tf.placeholder("float")
     b = tf.placeholder("float")
     c = tf.multiply(a, b)
-
     #T = lstm_test(X)
     #test,_ = lstm(train_x[0][0:0+2])
     #print("test", test)
@@ -472,36 +472,77 @@ def train_lstm(train_x, train_y, batch_size=80,time_step=2,train_begin=0,train_e
         #saver.restore(sess, module_file)
         #重复训练2000次
         for i in range(2):
-            for step in range(1):
+            print(batch_size)
+            batch_size = 5
+            for step in range(batch_size):
+                print(step)
                 tmp_x = train_x[step:step+1]
                 tmp_y = train_y[step:step+1]
                 tx = tf.stack(tmp_x)
                 x1 = tf.transpose(tx)
                 x2 = tf.unstack(x1, 28, 0)
-                x1_ = sess.run(x1)
+                x1_ = sess.run([x1])
                 x2_ = sess.run(x2)
-                print("XXXXXXXXXXXXXXXX")
-                print(x1)
-                print(x2)
-                print(x1_)
-                print(x2_)
-                print("XXXXXXXXXXXXXXXX")
-                print(tmp_x, tmp_y)
-                print("XXXXXXXXXXXXXXXX")
-                pred_ = sess.run([pred],feed_dict={X:x1})
+                #print(x1.ndims)
+                #print("XXXXXXXXXXXXXXXX")
+                #print(x1)
+                #print(x2)
+                #print(x1_)
+                #print(x2_)
+                #print("XXXXXXXXXXXXXXXX")
+                #print(tmp_x, tmp_y)
+                #print("XXXXXXXXXXXXXXXX")
+                #pred_ = sess.run([pred],feed_dict={X:x1_})
+                #print(pred_)
                 #print(step, "=", train_x[0][step:step+2])
                 #t_y = sess.run([tf.slice(train_y, [step, 0], [step + 1, 5])])
                 #loss_ = sess.run([loss],feed_dict={X:tmp_x,Y:tmp_y})
                 #train_op_ = sess.run([train_op],feed_dict={X:train_x[0][step:step+1],Y:train_y[0][step:step+1]})
-                #_,loss_=sess.run([train_op,loss],feed_dict={X:train_x[0][step:step+1],Y:train_y[0][step:step+1]})
+                _,loss_=sess.run([train_op,loss],feed_dict={X:x1_,Y:tmp_y})
+                #print(loss_)
                 #print(step, t_x, t_y)
                 #_,loss_=sess.run([train_op,loss],feed_dict={X:train_x,Y:train_y})
-            #print(i,loss_)
-            #if i % 200==0:
-            #    print("保存模型：",saver.save(sess,'stock2.model',global_step=i))
+            print(i,loss_)
+            print("保存模型：",saver.save(sess,'stock2.model',global_step=i))
     return train_x
-'''
-def prediction(time_step=20):
+
+def pred_test(test_x, test_y, test_size, time_step=20):
+    x=tf.placeholder(tf.float32, shape=[None,28, 1])
+    y=tf.placeholder(tf.float32, shape=[None,5])
+    seqlen = 4
+    pred = dynamicRNN(x, seqlen, weights, biases)
+
+    # Define loss and optimizer
+    cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=pred, labels=y))
+    optimizer = tf.train.GradientDescentOptimizer(learning_rate=learning_rate).minimize(cost)
+
+    # Evaluate model
+    correct_pred = tf.equal(tf.argmax(pred,1), tf.argmax(y,1))
+    accuracy = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
+
+    # Initializing the variables
+    init = tf.global_variables_initializer()
+    
+    saver=tf.train.Saver(tf.global_variables())
+    outfile="out/"
+    #module_file = tf.train.latest_checkpoint(outfile)    
+    module_file = tf.train.latest_checkpoint(outfile, latest_filename="train")
+    # Launch the graph
+    with tf.Session() as sess:
+        sess.run(init)
+        saver.restore(sess, module_file) 
+        for step in range(test_size):
+            tmp_x = test_x[step:step+1]
+            tmp_y = test_y[step:step+1]
+            tx = tf.stack(tmp_x)
+            x1 = tf.transpose(tx)
+            x1_ = sess.run([x1])
+            acc = sess.run(accuracy, feed_dict={x: x1_, y: tmp_y})
+            print(acc)
+    return acc
+
+
+def prediction(test_x, test_size, time_step=20):
     X=tf.placeholder(tf.float32, shape=[None,time_step,input_size])
     mean,std,test_x,test_y=get_test_data(time_step)
     pred,_=lstm(X)     
@@ -512,15 +553,19 @@ def prediction(time_step=20):
         module_file = tf.train.latest_checkpoint()
         saver.restore(sess, module_file) 
         test_predict=[]
-        for step in range(len(test_x)-1):
-          prob=sess.run(pred,feed_dict={X:[test_x[step]]})   
+        for step in range(test_size):
+          tmp_x = test_x[step:step+1]
+          tx = tf.stack(tmp_x)
+          x1 = tf.transpose(tx)
+          x1_ = sess.run([x1])
+          prob=sess.run(pred,feed_dict={X:x1_})   
           predict=prob.reshape((-1))
           test_predict.extend(predict)
         test_y=np.array(test_y)*std[7]+mean[7]
         test_predict=np.array(test_predict)*std[7]+mean[7]
         acc=np.average(np.abs(test_predict-test_y[:len(test_predict)])/test_y[:len(test_predict)]) #acc为测试集偏差
     return acc
-'''
+
 #numpy.set_printoptions(threshold='nan')
 
 filenames_000001 = ["data/sh_hq_000001_2011.csv", "data/sh_hq_000001_2012.csv", "data/sh_hq_000001_2013.csv", "data/sh_hq_000001_2014.csv", \
@@ -537,7 +582,7 @@ lines_300188 = get_file_line(filename_s=filenames_300188)
 begin = lines_000001 - lines_300188 + 1
 #后面5个数据无法测试
 test_day = 5
-input_size = 50 #lines_300188 - 1
+input_size = lines_300188 - 1
 output_size = input_size
 
 #e_val_000001, l_val_000001, example_batch_000001, label_batch_000001 = get_info_form_file(filenames_000001)
@@ -576,7 +621,7 @@ print(input_val)
 print(input_val.shape)
 print("XXXXXXXXXXXXXXXX")
 
-real_input_val, real_input_data = get_in_data_last5day(input_data, 0, input_size - 5)
+real_input_val, real_input_data = get_in_data_last5day(input_data, 0, input_size)
 print(real_input_data)
 
 print("=======================")
@@ -587,7 +632,7 @@ print("=======================")
 #print(out_val_300188)
 
 #测试数据获取
-'''
+
 filenames_000001_test = ["data/sh_hq_000001_2017.csv"]
 filenames_399001_test = ["data/sz_hq_399001_2017.csv"]
 filenames_399006_test = ["data/sz_hq_399006_2017.csv"]
@@ -629,22 +674,106 @@ input_val_test, input_data_test = get_in_concat_data(in1=in_put_000001_test, in2
 print(input_data_test)
 print(input_val_test)
 
-real_input_val_test, real_input_data_test = get_in_data_last5day(input_data_test, 0, input_size_test - 5)
+real_input_val_test, real_input_data_test = get_in_data_last5day(input_data_test, 0, input_size_test)
 print(real_input_data_test)
 
 print("=======================")
 output_data_val_test, output_data_test = get_out_data_last5day(out_put_300188_test, output_size_test)
 print(output_data_test)
 print("=======================")
-'''
+
 
 
 #X=tf.placeholder(tf.float32, shape=[None,10,28])
 #pred,states=lstm(X)
 #print(X, pred, states)
-_ = train_lstm(train_x = real_input_val, train_y = output_data_val)
+#_ = train_lstm(train_x = real_input_val, train_y = output_data_val, batch_size = input_size - 5)
+#_ = train_lstm(train_x = real_input_val, train_y = output_data_val, batch_size = input_size - 5)
 #_ = test_spahe(train_x = real_input_val)
+#_ = pred_test(test_x = real_input_val, test_y = output_data_val, test_size = 50, time_step=20)
+#_ = pred_test(test_x = real_input_val_test, test_y = output_data_val_test, test_size = 50, time_step=20)
 
+train_x = real_input_val
+train_y = output_data_val
+test_x = real_input_val_test
+test_y = output_data_val_test
+
+#训练
+x=tf.placeholder(tf.float32, shape=[None,28, 1])
+y=tf.placeholder(tf.float32, shape=[None,5])
+batch_index = 10
+step = 2
+seqlen = 4
+
+pred = dynamicRNN(x, seqlen, weights, biases)
+lr = 0.01
+#损失函数
+#loss=tf.reduce_mean(tf.square(tf.reshape(pred,[-1])-tf.reshape(y, [-1])))
+#train_op=tf.train.AdamOptimizer(learning_rate=lr).minimize(loss)
+
+cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=pred, labels=y))
+optimizer = tf.train.GradientDescentOptimizer(learning_rate=lr).minimize(cost)
+
+# Evaluate model
+out_x = tf.argmax(pred,1)
+out_y = tf.argmax(y,1)
+correct_pred = tf.equal(out_x, out_y)
+accuracy = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
+
+saver=tf.train.Saver(tf.global_variables(),max_to_keep=15)
+outfile="out/"
+module_file = tf.train.latest_checkpoint(outfile, latest_filename="train")
+with tf.Session() as sess:
+    sess.run(tf.global_variables_initializer())
+    #重复训练2000次
+    for i in range(1):
+        #print(batch_size)
+        batch_size = input_size - 5
+        print(input_size, batch_size)
+        for step in range(batch_size- 100, batch_size):
+            print(step)
+            tmp_x = train_x[step:step+1]
+            tmp_y = train_y[step:step+1]
+            tx = tf.stack(tmp_x)
+            x1 = tf.transpose(tx)
+            x1_ = sess.run([x1])
+            #print(x1_, tmp_y)
+            loss_ = sess.run(optimizer, feed_dict={x:x1_,y:tmp_y})
+            #_,loss_=sess.run([train_op,loss],feed_dict={x:x1_,y:tmp_y})
+        print(i,loss_)
+        print("保存模型：",saver.save(sess,'stock2.model',global_step=i))
+
+#测试
+
+    test_size = input_size_test - 5
+    for step in range(test_size):
+        tmp_test_x = test_x[step:step+1]
+        tmp_test_y = test_y[step:step+1]
+        test_tx = tf.stack(tmp_test_x)
+        test_x1 = tf.transpose(test_tx)
+        test_x1_ = sess.run([test_x1])
+        pred_ = sess.run(pred, feed_dict={x: test_x1_})
+        out_y_ = sess.run(out_y, feed_dict={y: tmp_test_y})
+        print("-------------------------")
+        print(tmp_test_x)
+        print(tmp_test_y)
+        print(pred_)
+        print("-------------------------")
+        acc = sess.run(accuracy, feed_dict={x: test_x1_, y: tmp_test_y})
+        print(acc)
+
+    for step in range(input_size_test - 5, input_size_test):
+        tmp_test_x = test_x[step:step+1]
+        test_tx = tf.stack(tmp_test_x)
+        test_x1 = tf.transpose(test_tx)
+        test_x1_ = sess.run([test_x1])
+        pred_ = sess.run(pred, feed_dict={x: test_x1_})
+        print("-------------------------")
+        print(tmp_test_x)
+        print(pred_)
+        print("-------------------------")
+        #acc = sess.run(accuracy, feed_dict={x: test_x1_, y: tmp_test_y})
+        #print(acc)
 
 '''
 in_1 = tf.concat([in_put_000001, in_put_399001], 1)
