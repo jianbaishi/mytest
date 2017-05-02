@@ -51,6 +51,7 @@ with tf.Session() as sess:
     coord.join(threads)
 
 '''
+import sys
 import tensorflow as tf
 from tensorflow.contrib import rnn
 import os
@@ -175,6 +176,7 @@ with tf.Session() as sess:
  
 import tensorflow as tf
 import numpy
+import time
 
 seq_max_len = 28
 n_input = 28
@@ -285,15 +287,65 @@ def get_in_data_last5day(int_put, begin, size):
 
 # 5day后的收盘价
 def get_out_data_last5day(out, lines):
-    out_put = tf.gather(out,[1, 2, 3, 4, 5])
-    out_put_tra = tf.transpose(out_put)
+
     #print(out_put_tra)
-    for index in range(1,lines - 5):
+    end = lines - 5
+    if end < 0:
+        end = 0
+        begin = 0
+        index = 0
+        tmp_index1 = begin + 1 + index
+        tmp_index2 = begin + 2 + index
+        tmp_index3 = begin + 3 + index
+        tmp_index4 = begin + 4 + index
+        tmp_index5 = begin + 5 + index
+        print(lines, begin, index, tmp_index1)
+        if tmp_index1 >= lines:
+           tmp_index1 = lines - 1
+        if tmp_index2 >= lines:
+            tmp_index2 = tmp_index1
+        if tmp_index3 >= lines:
+            tmp_index3 = tmp_index2
+        if tmp_index4 >= lines:
+            tmp_index4 = tmp_index3
+        if tmp_index5 >= lines:
+            tmp_index5 = tmp_index4
+        one_out = tf.gather(out,[tmp_index1, tmp_index2, tmp_index3, tmp_index4, tmp_index5])
+        out_put_tra = tf.transpose(one_out)
+    else:
+        out_put = tf.gather(out,[1, 2, 3, 4, 5])
+        out_put_tra = tf.transpose(out_put)
+
+    print(lines, end)
+    for index in range(1,end):
         one_out = tf.gather(out,[1 + index, 2 + index, 3 + index, 4 + index, 5 + index])
         one_out_tra = tf.transpose(one_out)
         out_put_tra = tf.concat([out_put_tra, one_out_tra], 0)
         #print(one_out)
         #print(one_out_tra)
+    
+    for index in range(end + 1, lines):
+        begin = 0
+        tmp_index1 = begin + 1 + index
+        tmp_index2 = begin + 2 + index
+        tmp_index3 = begin + 3 + index
+        tmp_index4 = begin + 4 + index
+        tmp_index5 = begin + 5 + index
+        #print(lines, begin, index, tmp_index1)
+        if tmp_index1 >= lines:
+           tmp_index1 = lines - 1
+        if tmp_index2 >= lines:
+            tmp_index2 = tmp_index1
+        if tmp_index3 >= lines:
+            tmp_index3 = tmp_index2
+        if tmp_index4 >= lines:
+            tmp_index4 = tmp_index3
+        if tmp_index5 >= lines:
+            tmp_index5 = tmp_index4
+        one_out = tf.gather(out,[tmp_index1, tmp_index2, tmp_index3, tmp_index4, tmp_index5])
+        one_out_tra = tf.transpose(one_out)
+        out_put_tra = tf.concat([out_put_tra, one_out_tra], 0)
+        
     print(out_put_tra)
     with tf.Session() as sess:  
         coord = tf.train.Coordinator()  #创建一个协调器，管理线程  
@@ -301,7 +353,7 @@ def get_out_data_last5day(out, lines):
         out_put_tra_val = sess.run(out_put_tra)
         print(out_put_tra_val)
         #print e_val,l_val  
-        coord.request_stop()  
+        coord.request_stop()
         coord.join(threads)
     return out_put_tra_val, out_put_tra
 
@@ -569,13 +621,13 @@ def prediction(test_x, test_size, time_step=20):
 #numpy.set_printoptions(threshold='nan')
 
 filenames_000001 = ["data/sh_hq_000001_2011.csv", "data/sh_hq_000001_2012.csv", "data/sh_hq_000001_2013.csv", "data/sh_hq_000001_2014.csv", \
-    "data/sh_hq_000001_2015.csv", "data/sh_hq_000001_2016.csv"]
+    "data/sh_hq_000001_2015.csv", "data/sh_hq_000001_2016.csv", "data/sh_hq_000001_2017.csv"]
 filenames_399001 = ["data/sz_hq_399001_2011.csv", "data/sz_hq_399001_2012.csv", "data/sz_hq_399001_2013.csv", "data/sz_hq_399001_2014.csv", \
-    "data/sz_hq_399001_2015.csv", "data/sz_hq_399001_2016.csv"]
+    "data/sz_hq_399001_2015.csv", "data/sz_hq_399001_2016.csv", "data/sz_hq_399001_2017.csv"]
 filenames_399006 = ["data/sz_hq_399006_2011.csv", "data/sz_hq_399006_2012.csv", "data/sz_hq_399006_2013.csv", "data/sz_hq_399006_2014.csv", \
-    "data/sz_hq_399006_2015.csv", "data/sz_hq_399006_2016.csv"]
+    "data/sz_hq_399006_2015.csv", "data/sz_hq_399006_2016.csv", "data/sz_hq_399006_2017.csv"]
 filenames_300188 = ["data/sz_hq_300188_2011.csv", "data/sz_hq_300188_2012.csv", "data/sz_hq_300188_2013.csv", "data/sz_hq_300188_2014.csv", \
-    "data/sz_hq_300188_2015.csv", "data/sz_hq_300188_2016.csv"]
+    "data/sz_hq_300188_2015.csv", "data/sz_hq_300188_2016.csv", "data/sz_hq_300188_2017.csv"]
 
 lines_000001 = get_file_line(filename_s=filenames_000001)
 lines_300188 = get_file_line(filename_s=filenames_300188)
@@ -625,6 +677,7 @@ real_input_val, real_input_data = get_in_data_last5day(input_data, 0, input_size
 print(real_input_data)
 
 print("=======================")
+print(out_put_300188)
 output_data_val, output_data = get_out_data_last5day(out_put_300188, output_size)
 print(output_data_val.shape)
 print(output_data_val[2:4])
@@ -633,10 +686,10 @@ print("=======================")
 
 #测试数据获取
 
-filenames_000001_test = ["data/sh_hq_000001_2017.csv"]
-filenames_399001_test = ["data/sz_hq_399001_2017.csv"]
-filenames_399006_test = ["data/sz_hq_399006_2017.csv"]
-filenames_300188_test = ["data/sz_hq_300188_2017.csv"]
+filenames_000001_test = ["data/sh_hq_000001_2017_test.csv"]
+filenames_399001_test = ["data/sz_hq_399001_2017_test.csv"]
+filenames_399006_test = ["data/sz_hq_399006_2017_test.csv"]
+filenames_300188_test = ["data/sz_hq_300188_2017_test.csv"]
 
 lines_000001_test = get_file_line(filename_s=filenames_000001_test)
 lines_300188_test = get_file_line(filename_s=filenames_300188_test)
@@ -693,6 +746,8 @@ print("=======================")
 #_ = pred_test(test_x = real_input_val, test_y = output_data_val, test_size = 50, time_step=20)
 #_ = pred_test(test_x = real_input_val_test, test_y = output_data_val_test, test_size = 50, time_step=20)
 
+input_state=sys.argv[1]
+
 train_x = real_input_val
 train_y = output_data_val
 test_x = real_input_val_test
@@ -708,8 +763,8 @@ seqlen = 4
 pred = dynamicRNN(x, seqlen, weights, biases)
 lr = 0.01
 #损失函数
-#loss=tf.reduce_mean(tf.square(tf.reshape(pred,[-1])-tf.reshape(y, [-1])))
-#train_op=tf.train.AdamOptimizer(learning_rate=lr).minimize(loss)
+loss=tf.reduce_mean(tf.square(tf.reshape(pred,[-1])-tf.reshape(y, [-1])))
+train_op=tf.train.AdamOptimizer(learning_rate=lr).minimize(loss)
 
 cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=pred, labels=y))
 optimizer = tf.train.GradientDescentOptimizer(learning_rate=lr).minimize(cost)
@@ -721,31 +776,49 @@ correct_pred = tf.equal(out_x, out_y)
 accuracy = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
 
 saver=tf.train.Saver(tf.global_variables(),max_to_keep=15)
-outfile="out/"
-module_file = tf.train.latest_checkpoint(outfile, latest_filename="train")
+checkpoint_dir="train/"
+#module_file = tf.train.latest_checkpoint(outfile, latest_filename="train")
 with tf.Session() as sess:
     sess.run(tf.global_variables_initializer())
-    #重复训练2000次
-    for i in range(1):
-        #print(batch_size)
-        batch_size = input_size - 5
-        print(input_size, batch_size)
-        for step in range(batch_size- 100, batch_size):
-            print(step)
-            tmp_x = train_x[step:step+1]
-            tmp_y = train_y[step:step+1]
-            tx = tf.stack(tmp_x)
-            x1 = tf.transpose(tx)
-            x1_ = sess.run([x1])
-            #print(x1_, tmp_y)
-            loss_ = sess.run(optimizer, feed_dict={x:x1_,y:tmp_y})
-            #_,loss_=sess.run([train_op,loss],feed_dict={x:x1_,y:tmp_y})
-        print(i,loss_)
-        print("保存模型：",saver.save(sess,'stock2.model',global_step=i))
+    print("restore:")
+    ckpt = tf.train.get_checkpoint_state(checkpoint_dir)
+    if ckpt and ckpt.model_checkpoint_path:
+        saver.restore(sess, ckpt.model_checkpoint_path)
+
+    if input_state == '0':
+#        print("restore:")
+#        ckpt = tf.train.get_checkpoint_state(checkpoint_dir)
+#        if ckpt and ckpt.model_checkpoint_path:
+#            saver.restore(sess, ckpt.model_checkpoint_path)
+#    else:
+        print("Train:")
+        #重复训练2000次
+        for i in range(35):
+            #print(batch_size)
+            batch_size = input_size - 5
+            print(input_size, batch_size)
+            for step in range(batch_size):
+                print(step)
+                tmp_x = train_x[step:step+1]
+                tmp_y = train_y[step:step+1]
+                tx = tf.stack(tmp_x)
+                x1 = tf.transpose(tx)
+                x1_ = sess.run([x1])
+                #print(x1_, tmp_y)
+                #loss_ = sess.run(optimizer, feed_dict={x:x1_,y:tmp_y})
+                _,loss_=sess.run([train_op,loss],feed_dict={x:x1_,y:tmp_y})
+                if step % 100 == 0:
+                    pred_ = sess.run(pred, feed_dict={x: x1_})
+                    print("#input: ", tmp_x)
+                    print("#output: ", tmp_y)
+                    print("#pred: ", pred_)
+            print(i,loss_)
+            filename=checkpoint_dir + 'train.model'
+            print("Save file：",saver.save(sess,filename,global_step=int(time.time())))
 
 #测试
 
-    test_size = input_size_test - 5
+    test_size = input_size_test
     for step in range(test_size):
         tmp_test_x = test_x[step:step+1]
         tmp_test_y = test_y[step:step+1]
@@ -760,18 +833,20 @@ with tf.Session() as sess:
         print(pred_)
         print("-------------------------")
         acc = sess.run(accuracy, feed_dict={x: test_x1_, y: tmp_test_y})
-        print(acc)
+        #loss_ = sess.run(optimizer, feed_dict={x: test_x1_, y: tmp_test_y})
+        _,loss_=sess.run([train_op,loss],feed_dict={x: test_x1_, y: tmp_test_y})
+        #print(acc)
 
-    for step in range(input_size_test - 5, input_size_test):
-        tmp_test_x = test_x[step:step+1]
-        test_tx = tf.stack(tmp_test_x)
-        test_x1 = tf.transpose(test_tx)
-        test_x1_ = sess.run([test_x1])
-        pred_ = sess.run(pred, feed_dict={x: test_x1_})
-        print("-------------------------")
-        print(tmp_test_x)
-        print(pred_)
-        print("-------------------------")
+#    for step in range(input_size_test):
+#        tmp_test_x = test_x[step:step+1]
+#        test_tx = tf.stack(tmp_test_x)
+#        test_x1 = tf.transpose(test_tx)
+#        test_x1_ = sess.run([test_x1])
+#        pred_ = sess.run(pred, feed_dict={x: test_x1_})
+#        print("**************************")
+#        print(tmp_test_x)
+#        print(pred_)
+#        print("**************************")
         #acc = sess.run(accuracy, feed_dict={x: test_x1_, y: tmp_test_y})
         #print(acc)
 
