@@ -224,6 +224,7 @@ def read(filenames, batch_size):
     #in_put_f = tf.stack([[col5], [col6], [col7], [col8], [col9], [col10], [col13]])
     out_put_f = tf.stack([col10])
     tf.set_random_seed(0)
+    print(features, features_1, in_put_f, out_put_f)
     example_batch, label_batch, in_put, out_put = tf.train.batch([features, features_1, in_put_f, out_put_f], batch_size=batch_size, capacity=2000, num_threads=1)
     
     # 运行Graph  
@@ -761,7 +762,7 @@ step = 2
 seqlen = 4
 
 pred = dynamicRNN(x, seqlen, weights, biases)
-lr = 0.01
+lr = 0.1
 #损失函数
 loss=tf.reduce_mean(tf.square(tf.reshape(pred,[-1])-tf.reshape(y, [-1])))
 train_op=tf.train.AdamOptimizer(learning_rate=lr).minimize(loss)
@@ -793,12 +794,11 @@ with tf.Session() as sess:
 #    else:
         print("Train:")
         #重复训练2000次
-        for i in range(35):
+        for i in range(2):
             #print(batch_size)
             batch_size = input_size - 5
             print(input_size, batch_size)
             for step in range(batch_size):
-                print(step)
                 tmp_x = train_x[step:step+1]
                 tmp_y = train_y[step:step+1]
                 tx = tf.stack(tmp_x)
@@ -807,6 +807,7 @@ with tf.Session() as sess:
                 #print(x1_, tmp_y)
                 #loss_ = sess.run(optimizer, feed_dict={x:x1_,y:tmp_y})
                 _,loss_=sess.run([train_op,loss],feed_dict={x:x1_,y:tmp_y})
+                print(step, loss_)
                 if step % 100 == 0:
                     pred_ = sess.run(pred, feed_dict={x: x1_})
                     print("#input: ", tmp_x)
